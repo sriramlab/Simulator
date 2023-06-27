@@ -1,2 +1,2 @@
-# Phenolator
-Efficient large scale phenotype simulator 
+# Simulator
+Efficient large-scale phenotype simulator 

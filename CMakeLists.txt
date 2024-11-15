@@ -20,3 +20,9 @@ ADD_DEFINITIONS(-DDEBUG=${DEBUG})
 
 add_executable(Simulator_mafld src/simulator_maf_ld_arch.cpp src/genotype.cpp src/storage.cpp)
 add_executable(Simulator_annot src/simulator.annot.cpp src/genotype.cpp src/storage.cpp)
+
+add_executable(Simulator_gxe src/simulator_maf_ld_arch_gxe.cpp src/genotype.cpp src/storage.cpp)
+add_executable(Simulator_gxe_with_corr src/simulator_maf_ld_arch_gxe_with_corr.cpp src/genotype.cpp src/storage.cpp)
+add_executable(Simulator_gxe_same_causal src/simulator_maf_ld_arch_gxe_same_causal.cpp src/genotype.cpp src/storage.cpp)
+add_executable(Simulator_gxe_causal_from_file src/simulator_maf_ld_arch_gxe_causal_from_file.cpp src/genotype.cpp src/storage.cpp)
+add_executable(Simulator_gxe_heavy_tail src/simulator_maf_ld_arch_gxe_heavy_tail.cpp src/genotype.cpp src/storage.cpp)

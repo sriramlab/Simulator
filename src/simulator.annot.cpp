@@ -1452,8 +1452,8 @@ int main(int argc, char const *argv[]){
   
 
 //boost::mt19937 seedr;
-seedr.seed(rdtsc());
-//seedr.seed(std::time(0));
+// seedr.seed(rdtsc());
+seedr.seed(std::time(0));
 boost::normal_distribution<> dist(0,1);
 boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_size(seedr, dist);
 

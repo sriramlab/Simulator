@@ -39,6 +39,10 @@ struct options{
 	bool missing;
 	bool text_version;
 	double beta;
+
+	float corr_w_E;
+	std::string causal_snp_file;
+	std::string add_effct_file;
 };
 
 /*template<typename T, typename U>
@@ -213,6 +217,10 @@ void parse_args(int argc, char const *argv[]){
 	command_line_opts.fast_mode=true;
 	command_line_opts.missing=false;
 	command_line_opts.text_version = false;
+
+	command_line_opts.corr_w_E = 0;
+	command_line_opts.causal_snp_file = "";
+	command_line_opts.add_effct_file = "";
 	
 
 	if(argc<3){
@@ -314,6 +322,15 @@ void parse_args(int argc, char const *argv[]){
 
 			else if(strcmp(argv[i],"-aem")==0){
 				command_line_opts.accelerated_em = atof(argv[i+1]);
+				i++;			
+			} else if (strcmp(argv[i], "-corr_w_E")==0){
+				command_line_opts.corr_w_E = atof(argv[i+1]);
+				i++;
+			} else if (strcmp(argv[i], "-causal_snp_file")==0) {
+				command_line_opts.causal_snp_file = string(argv[i+1]);
+				i++;
+			} else if (strcmp(argv[i], "-add_effect_file")==0) {
+				command_line_opts.add_effct_file = string(argv[i+1]);
 				i++;
 			}
 			else if(strcmp(argv[i],"-v")==0)

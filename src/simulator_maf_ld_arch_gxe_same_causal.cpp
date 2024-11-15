@@ -37,17 +37,6 @@
 	#define fastmultiply_pre fastmultiply_pre_normal
 #endif
 
-#ifdef _WIN32
-#define rdtsc __rdtsc
-#else
-
-unsigned long long rdtsc(){
-    unsigned int lo,hi;
-    __asm__ __volatile__ ("rdtsc" : "=a" (lo), "=d" (hi));
-    return ((unsigned long long)hi << 32) | lo;
-}
-#endif
-
 using namespace Eigen;
 using namespace std;
 
@@ -63,8 +52,6 @@ class data {
      MatrixXdr maf;
 };
 
-// declare a single seedr that is seeded once at the start of main
-boost::mt19937 seedr;
 
 //Intermediate Variables
 int blocksize;
@@ -76,6 +63,7 @@ double *yint_m;
 double **y_e;
 double **y_m;
 
+boost::mt19937 seedr;
 
 struct timespec t0;
 
@@ -128,6 +116,7 @@ bool fast_mode = true;
 bool text_version = false;
 bool use_cov=false; 
 
+bool simul_gxe=false;
 
 /////
 bool mean_impute=true;
@@ -149,6 +138,7 @@ int Nbin;
 int Nz=10;
 ///////
 
+MatrixXdr Enviro;
 //define random vector z's
 MatrixXdr  all_zb;
 MatrixXdr  all_Uzb;
@@ -161,6 +151,8 @@ MatrixXdr yXXy;
 MatrixXdr maf_ld;
 MatrixXdr A_effect;
 MatrixXdr A_effect_multi;
+//MatrixXdr GxE_effect;
+MatrixXdr GxE_effect_multi;
 vector<string> fid;
 MatrixXdr simul_pheno;
 MatrixXdr simul_par;
@@ -182,6 +174,7 @@ int nrow, ncol;
 unsigned char *gtype;
 int Nsnp;
 int Nindv;
+int Nenv;
 bool **bin_annot;
 int step_size;
 int step_size_rem;
@@ -213,6 +206,9 @@ MatrixXdr UXXz;
 MatrixXdr XXUz;
 MatrixXdr Xz;
 MatrixXdr trVK;
+
+float corr_w_E=0;
+MatrixXdr cas;
 
 std::istream& newline(std::istream& in)
 {
@@ -1646,7 +1642,7 @@ void read_simul_par(std::string filename){
 //double p_casual,double ld_ex,double maf_ex,double min_maf,double max_maf,double h2,int num
         
 	int num_par=7;
-	int num_vc=2;
+	int num_vc=3;
 	simul_par.resize(num_par,num_vc);
         ifstream ifs(filename.c_str(), ios::in);
 
@@ -1682,63 +1678,78 @@ void read_simul_par(std::string filename){
 
 
 
-void make_maf_ld_effect(double p_casual,double ld_ex,double maf_ex,double min_maf,double max_maf,double h2,int num){
+MatrixXdr  make_maf_ld_effect(double p_casual,double ld_ex,double maf_ex,double min_maf,double max_maf,double h2,int num, bool record, bool use_exist, std::string file_name){
 
-    std::ofstream outfile;
-	if(dominance==true){
-	outfile.open("causal_snp_dom.txt", std::ios_base::out);
-	}
-	else{
-        outfile.open(command_line_opts.OUTPUT_FILE_PATH+".causal_snps_annot.txt", std::ios_base::out);
-	}
-	//MatrixXdr A_effect;
-	A_effect.resize(Nsnp,1);
-        A_effect_multi.resize(Nsnp,num);
+	MatrixXdr effect;
+	MatrixXdr effect_multi;
 
-    // method 1: toss a coin (varying # of causals)
-	//boost::mt19937 seedr;
-    //seedr.seed(std::time(0));
-    //seed with rdtsc:
-    //seedr.seed(rdtsc());
-    boost::bernoulli_distribution<> b_dist(p_casual);
-    boost::variate_generator<boost::mt19937&, boost::bernoulli_distribution<>  > coin(seedr, b_dist);
+        effect.resize(Nsnp,1);
+        effect_multi.resize(Nsnp,num);
+
+        if (use_exist == true) {
+                std::ofstream outfile;
+                std::string file_name_copy = file_name + "_copy";
+                if (record == true) {
+                        outfile.open(file_name_copy.c_str(), std::ios_base::out);
+                }
+
+               ifstream ifs(file_name.c_str(), ios::in);
+
+                std::string line;
+                std::istringstream in;
+                string temp;
+
+                cout<<"reading causal snp index from "<< file_name << endl;
+                double val;
+                int i=0;
+                while(std::getline(ifs, line) && (i < Nsnp)){
+                        in.clear();
+                        in.str(line);
+                        in >> temp;
+                        val = atoi(temp.c_str());
+                        cas(i,0)=val;
+                        i++;
+                }
+                outfile<<cas<<endl;
+                outfile.close();
+
+        } else 
+        {
+                std::ofstream outfile;
+                if (record == true) {
+                        outfile.open(file_name.c_str(), std::ios_base::out);
+                        // if(dominance==true){
+                        // outfile.open("causal_snp_dom.txt", std::ios_base::out);
+                        // }
+                        // else{
+                        // outfile.open("causal_snp_add.txt", std::ios_base::out);
+                        // }
+                }
+                //MatrixXdr A_effect;
+                
 
 
-	MatrixXdr cas;
-	cas.resize(Nsnp,1);
+                //boost::mt19937 seedr;
+                //seedr.seed(std::time(0));
+                boost::bernoulli_distribution<> b_dist(p_casual);
+                boost::variate_generator<boost::mt19937&, boost::bernoulli_distribution<>  > coin(seedr, b_dist);
 
-    bool fix_ncausals = true;
-    if (!fix_ncausals){
-	    for (int i=0;i<Nsnp;i++){
-	        cas(i,0)=coin();
-	        if(maf_ld(i,2)<min_maf || maf_ld(i,2)>max_maf)
-		        cas(i,0)=0;
-	    }
-    }
-    else{
-        // method 2: random selection (fixed # of causals)
-        boost::uniform_int<> idxs(0, Nsnp-1);
-        boost::variate_generator<boost::mt19937&, boost::uniform_int<> > get_snp_idx(seedr, idxs);
-        int ncausals = p_casual*Nsnp;
-        for (int i=0; i<Nsnp; i++)
-            cas(i,0)=0;
-        while (ncausals != 0){
-            int tmp = get_snp_idx();
-            if ((cas(tmp, 0) == 0) && (maf_ld(tmp,2) >= min_maf) && (maf_ld(tmp,2) <= max_maf) ){
-                cas(tmp,0) = 1;
-                ncausals--;
-            }
+                cas.resize(Nsnp,1);
+                for (int i=0;i<Nsnp;i++){
+                cas(i,0)=coin();
+                if(maf_ld(i,2)<min_maf || maf_ld(i,2)>max_maf)
+                                cas(i,0)=0;
+
+                }
+                cout<<cas.sum()<<endl;
+
+
+                ///write causal snps in files 
+                outfile<<cas<<endl;
+                outfile.close(); 
+                ///
         }
-    }
 
-	cout<<cas.sum()<<endl;
-
-
-	///write causal snps in files 
-	outfile<<cas<<endl;
-	outfile.close(); 
-	///
-	
 	maf_ld.col(0)=maf_ld.col(0).array().pow(maf_ex);
 	maf_ld.col(1)=maf_ld.col(1).array().pow(ld_ex);
 
@@ -1747,49 +1758,38 @@ void make_maf_ld_effect(double p_casual,double ld_ex,double maf_ex,double min_ma
 	cout<<"c"<<cas(0,0)<<endl;
 	*/
 
-	A_effect=maf_ld.col(0).array()*maf_ld.col(1).array()*cas.array();
-	
-	//cout<<"c_ld_f"<<effect(0,0)<<endl;
+	effect=maf_ld.col(0).array()*maf_ld.col(1).array()*cas.array();
 
-	double cons_fact=(double)h2/A_effect.sum();
-    
-    // Fix per-SNP heritability instead of total h2
-	//double cons_fact=(double)h2/Nsnp;
-    
-    cout << "h2: " << h2 << endl
-        << "cons_fact: " << cons_fact << endl
-        << "A_effect.sum(): " << A_effect.sum() << endl;
+	double cons_fact=(double)h2/effect.sum();
 
-	//cout<<"const"<<cons_fact<<endl;
 	
-	A_effect=A_effect*cons_fact;
+	effect=effect*cons_fact;
 
 
 
 	//cout<<"normalized eff"<<effect(0,0)<<endl;
-	cout<<"sum  "<<A_effect.sum()<<endl;
+	cout<<"sum  "<<effect.sum()<<endl;
 
 	 for (int i=0;i<Nsnp;i++){
-		boost::normal_distribution<> dist(0,sqrt(A_effect(i,0)));
+		boost::normal_distribution<> dist(0,sqrt(effect(i,0)));
         	boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_size(seedr, dist);
 	//	cout<<i<<" "<<sqrt(A_effect(i,0))<<endl;
 		for (int j=0;j<num;j++){
-		A_effect_multi(i,j)=effect_size();
+		effect_multi(i,j)=effect_size();
 
 		}
 	}
-
 	
 				
 
        
-
+return effect_multi;
 }
 
 void make_dom_effect(double p_casual,double h2d,int num){
 
-	//boost::mt19937 seedr;
-        //seedr.seed(std::time(0));
+//	boost::mt19937 seedr;
+  //      seedr.seed(std::time(0));
         boost::bernoulli_distribution<> b_dist(p_casual);
         boost::variate_generator<boost::mt19937&, boost::bernoulli_distribution<>  > coin(seedr, b_dist);
 
@@ -1953,6 +1953,85 @@ MatrixXdr  compute_Xv (int num_snp,MatrixXdr new_zb){
 
 
 
+int read_env(bool std,int Nind, std::string filename, std::string covname){
+        ifstream ifs(filename.c_str(), ios::in);
+        std::string line;
+        std::istringstream in;
+        int covIndex = 0;
+        std::getline(ifs,line);
+        in.str(line);
+        string b;
+        vector<vector<int> > missing;
+        int covNum=0;
+
+//      
+        //mask.resize(Nind, 1);
+
+        while(in>>b)
+        {
+                if(b!="FID" && b !="IID"){
+                missing.push_back(vector<int>()); //push an empty row  
+                if(b==covname && covname!="")
+                        covIndex=covNum;
+                covNum++;
+                }
+        }
+        vector<double> cov_sum(covNum, 0);
+        if(covname=="")
+        {
+                Enviro=MatrixXdr::Zero(Nind,covNum);
+                //Enviro.resize(Nind, covNum);
+                cout<< "Read in "<<covNum << " Enviroment.. "<<endl;
+        }
+        else
+        {
+                Enviro.resize(Nind, 1);
+                cout<< "Read in covariate "<<covname<<endl;
+        }
+
+        int j=0;
+        while(std::getline(ifs, line)){
+                in.clear();
+                in.str(line);
+                string temp;
+                in>>temp; in>>temp; //FID IID 
+                for(int k=0; k<covNum; k++){
+
+                        in>>temp;
+			double cur;
+                        if(temp=="NA")
+                        {
+                                 cur=0;
+                         //   missing[k].push_back(j);
+                                continue;
+                        }
+                         cur = atof(temp.c_str());
+                        if(cur==-9)
+                        {
+                         //       missing[k].push_back(j);
+                                continue;
+                        }
+                        if(covname=="")
+                        {
+                                cov_sum[k]= cov_sum[k]+ cur;
+                                Enviro(j,k) = cur;
+                        }
+                        else
+                                if(k==covIndex)
+                                {
+                                        Enviro(j, 0) = cur;
+                                        cov_sum[k] = cov_sum[k]+cur;
+                                }
+                }
+                //if(j<10) 
+                //      cout<<covariate.block(j,0,1, covNum)<<endl; 
+                j++;
+        }
+
+        return covNum;
+}
+
+
 
 
 
@@ -1971,7 +2050,7 @@ global_snp_index=-1;
 int point_index=0;
 for (int jack_index=0;jack_index<Njack;jack_index++){
 
-	//cout<<"jack index"<<jack_index<<endl;
+	cout<<"jack index"<<jack_index<<endl;
         int read_Nsnp=(jack_index<(Njack-1)) ? (step_size) : (step_size+step_size_rem);
 
        if(use_mailman==true){
@@ -2083,9 +2162,18 @@ for (int jack_index=0;jack_index<Njack;jack_index++){
 
 
 	MatrixXdr vec_eff=A_effect_multi.block(point_index,0,num_snp,num_simul).transpose();
-	point_index=point_index+num_snp;
-	simul_pheno+=compute_Xv(num_snp,vec_eff);
+	MatrixXdr vec_eff_gxe=GxE_effect_multi.block(point_index,0,num_snp,num_simul).transpose();
 
+	point_index=point_index+num_snp;
+	
+	//if(simul_gxe==false)
+	simul_pheno+=compute_Xv(num_snp,vec_eff);
+	
+	if(simul_gxe==true){
+		MatrixXdr gxe_eff=compute_Xv(num_snp,vec_eff_gxe);
+		gxe_eff=gxe_eff.array().colwise()*Enviro.col(0).array();
+		simul_pheno+=gxe_eff;
+	}
 
 
 /////////////////
@@ -2158,12 +2246,15 @@ int main(int argc, char const *argv[]){
         k = k_orig + command_line_opts.l;
         k = (int)ceil(k/10.0)*10;
         command_line_opts.l = k - k_orig;
-        srand((unsigned int) time(0));
+        //srand((unsigned int) time(0));
 	Nz=command_line_opts.num_of_evec;
         k=Nz;
 
 	Njack=command_line_opts.jack_number;
 
+        corr_w_E=command_line_opts.corr_w_E;
+
+	seedr.seed(std::time(0));
 ////
 string filename;
 //////////////////////////// Read multi genotypes
@@ -2191,11 +2282,6 @@ read_annot(filename);
 ///reading phnotype and save the number of indvs
 filename=command_line_opts.PHENOTYPE_FILE_PATH;
 count_pheno(filename);
-
-
-//EDIT: seed the seedr once at the start of main
-// seedr.seed(rdtsc());
-seedr.seed(std::time(0));
 
 std::stringstream f0;
 f0 << geno_name << ".fam";
@@ -2226,30 +2312,34 @@ read_mafld(filename);
 global_MAF.resize(Nsnp,1);
 
 allgen_mail.resize(Nbin);  
-//allgen.resize(Nbin);
+allgen.resize(Nbin);
 
 double h2A=0;
-double h2D=0;
+double h2gxe=0;
 filename=command_line_opts.simul_par_PATH;
+
+std::string causal_snp_file=command_line_opts.causal_snp_file;
+
 read_simul_par(filename);
-make_maf_ld_effect(simul_par(0,0),simul_par(1,0),simul_par(2,0),simul_par(3,0),simul_par(4,0),simul_par(5,0),simul_par(6,0));
+A_effect_multi=make_maf_ld_effect(simul_par(0,0),simul_par(1,0),simul_par(2,0),simul_par(3,0),simul_par(4,0),simul_par(5,0),simul_par(6,0),
+true,false,causal_snp_file);
 
 num_simul=simul_par(6,0);
 
 Nz=num_simul;
 k=Nz;
-cout<<"number of simulations: "<<num_simul<<endl;
+cout<<"number of simulations"<<num_simul<<endl;
 
 simul_pheno=MatrixXdr::Zero(Nindv,num_simul);
 
 use_mailman=true;
 dominance=false;
-process(name,1);
+//process(name,1);
 h2A=simul_par(5,0);
 
 
 bool simul_dom=false;
-
+/*
 if(simul_dom==true){
 dominance=true;
 
@@ -2259,14 +2349,53 @@ make_maf_ld_effect(simul_par(0,1),simul_par(1,1),simul_par(2,1),simul_par(3,1),s
 process(name,1);
  h2D=simul_par(5,1);
 }
+*/
+simul_gxe=true;
+string envfile=command_line_opts.ENV_FILE_PATH;
+Nenv=read_env(false,Nindv,envfile,"");
+//cout<<"print enviro"<<endl;
+//cout<<Enviro<<endl;
+if(simul_gxe==true){
+//string envfile="/home/alipazoki/simulated.data.GxE/simul.env";
+//string envfile=command_line_opts.ENV_FILE_PATH;
+//Nenv=read_env(false,Nindv,envfile,"");
+//cout<<"print enviro"<<endl;
+//cout<<Enviro<<endl;
+GxE_effect_multi=make_maf_ld_effect(simul_par(0,1),simul_par(1,1),simul_par(2,1),simul_par(3,1),simul_par(4,1),simul_par(5,1),simul_par(6,0),
+true,true,causal_snp_file);
+h2gxe=simul_par(5,1);
+process(name,1);
+}
 
+cout<<"h2gxe"<<h2gxe<<endl;
+cout<<"h2g"<<h2A<<endl;
 
+/*
 
-
-
-//boost::mt19937 seedr;
-boost::normal_distribution<> dist(0,sqrt(1-h2A-h2D));
+boost::mt19937 seedr;
+boost::normal_distribution<> dist(0,sqrt(1));
 boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_env(seedr, dist);
+
+boost::normal_distribution<> dist1(0,sqrt(2));
+boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_env1(seedr, dist1);
+*/
+
+
+bool simul_NxE=true;
+double h2nxe;
+//h2nxe=h2gxe;
+//h2nxe=0.25;
+h2nxe=simul_par(5,2);
+cout<<"h2nxe"<<h2nxe<<endl;
+boost::normal_distribution<> dist(0,sqrt(1-h2A-h2nxe-h2gxe));
+boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_env(seedr, dist);
+
+boost::normal_distribution<> dist1(0,sqrt(1-h2A-h2gxe));
+boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_env1(seedr, dist1);
+
+
+boost::normal_distribution<> dist_nxe(0,sqrt(h2nxe));
+boost::variate_generator<boost::mt19937&, boost::normal_distribution<> > effect_nxe(seedr, dist_nxe);
 
 
 
@@ -2279,16 +2408,31 @@ for ( int i=0;i<num_simul;i++){
 	cout<<"writing "<<i<<"-th simulation"<<endl;
 
 	string index=boost::lexical_cast<string>(i);
-	string name=add_output+index+".phen";
-    // for varying causal SNPs:
-	//string name=add_output+".phen";
+	string name=add_output+index+".pheno";
 	std::ofstream outfile;
 	outfile.open(name, std::ios_base::out);
 	
 	cout<<name<<endl;
 	outfile<<"FID IID pheno"<<endl;
 	for (int j=0;j<Nindv;j++){
-		outfile<<fid[j]<<" "<<fid[j]<<" "<<simul_pheno(j,i)+effect_env()<<endl;		
+
+	     if(simul_NxE==true){
+
+		 simul_pheno(j,i)=simul_pheno(j,i)+(Enviro(j,0)*effect_nxe())+effect_env();
+                 simul_pheno(j,i)=simul_pheno(j,i)+(Enviro(j,0)*corr_w_E/(1-corr_w_E*corr_w_E));
+
+		 outfile<<fid[j]<<" "<<fid[j]<<" "<<simul_pheno(j,i)<<endl;
+		/*if(Enviro(j,0)==1){
+		outfile<<fid[j]<<" "<<fid[j]<<" "<<simul_pheno(j,i)+effect_env()<<endl;	
+		}
+		else{
+		outfile<<fid[j]<<" "<<fid[j]<<" "<<simul_pheno(j,i)+effect_env1()<<endl;
+		}*/
+
+	     }else{
+		outfile<<fid[j]<<" "<<fid[j]<<" "<<simul_pheno(j,i)+effect_env1()<<endl;
+			
+	     }		
 	}
 	outfile.close();
 }

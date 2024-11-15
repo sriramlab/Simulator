@@ -74,7 +74,7 @@ make
 
 * `-g`: Genotype file in BED format
 * `-e`: Environment file in TXT format
-  * N rows (N = number of individuals), 1 column.
+  * N rows (N = number of individuals), L column (L = number of environments).
 * `-annot`: Annotation file in TXT format
 * `-o`: Output directory
 * `-maf_ld`: File with MAF and LD of SNPs

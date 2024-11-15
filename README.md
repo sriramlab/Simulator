@@ -34,8 +34,8 @@ make
 To set up the simulator, clone the repository and build the project:
 
 ```bash
-git clone https://github.com/alipazokit/simulator.git
-cd simulator
+git clone https://github.com/sriramlab/Simulator.git
+cd Simulator
 mkdir build
 cd build/
 cmake ..

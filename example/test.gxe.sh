@@ -32,3 +32,10 @@ mkdir -p ${out}
 out=./pheno_gxe_heavy_tail/
 mkdir -p ${out}
 ../build/Simulator_gxe_heavy_tail -g $gen -e $env  -simul_par  $par -maf_ld $mafld   -k 10 -jn 100  -o $out -annot $annot
+
+## one-hot E
+out=./pheno_gxe_one_hot/
+par=param.gxe.one_hot.txt
+env=dummy_env.bin.txt
+mkdir -p ${out}
+../build/Simulator_one_hot -g $gen -e $env  -simul_par  $par -maf_ld $mafld   -k 10 -jn 100  -o $out -annot $annot

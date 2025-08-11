@@ -101,12 +101,24 @@ make
 #### Parameters: 
 * Same as **Simulator_gxe** 
 
+### Simulator_gxg
+#### Parameters:
+* `-g` : Genotype file in BED format
+* `-annot`: Annotation file in TXT format
+  * M rows (M=number  of SNPs) and 3 columns.
+  * First column corresponds to SNPs with additive effect. 
+  * Second and third column correspond to two groups of SNPs which have interaction with each other (there is no interaction inside each group). Third column/group is assumed to be smaller than second.
+  * If SNP i belongs to annotation j, then there is  "1" in row i and column j. Otherwise there is "0". (delimiter is " ")
+* `-jn`: The number of stream blocks. (the higher number of blocks, the lower memory usage)
+* `-o`: The path of output file.
+
 
 ## Examples
 
 Toy examples are provided in the `example` folder:
 * `test.sh`
 * `test.gxe.sh`
+* `test.gxg.sh`
 
 
 ## Citations
@@ -116,3 +128,6 @@ Toy examples are provided in the `example` folder:
 
 2. Ali Pazokitoroudi, Yue Wu, Kathryn S. Burch, Kangcheng Hou, Aaron Zhou, Bogdan Pasaniuc, Sriram Sankararaman.
    *Nature Communications (2020)*; DOI: [10.1038/s41467-020-17576-9](https://doi.org/10.1038/s41467-020-17576-9)
+
+3. Boyang Fu*, Ali Pazokitoroudi*, Albert Xue, Aakarsh Anand, Prateek Anand, Noah Zaitlen, Sriram Sankararaman.
+   *bioRxiv*, 2020. DOI: [10.1101/2023.09.10.557084](https://doi.org/10.1101/2023.09.10.557084)

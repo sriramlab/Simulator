@@ -26,3 +26,8 @@ add_executable(Simulator_gxe_with_corr src/simulator_maf_ld_arch_gxe_with_corr.c
 add_executable(Simulator_gxe_same_causal src/simulator_maf_ld_arch_gxe_same_causal.cpp src/genotype.cpp src/storage.cpp)
 add_executable(Simulator_gxe_causal_from_file src/simulator_maf_ld_arch_gxe_causal_from_file.cpp src/genotype.cpp src/storage.cpp)
 add_executable(Simulator_gxe_heavy_tail src/simulator_maf_ld_arch_gxe_heavy_tail.cpp src/genotype.cpp src/storage.cpp)
+
+add_executable(Simulator_corr src/simulator_maf_ld_arch_corr.cpp src/genotype.cpp src/storage.cpp)
+add_executable(Simulator_gxe_multi_E src/simulator_maf_ld_arch_gxe_multi_E.cpp src/genotype.cpp src/storage.cpp)
+
+add_executable(Simulator_gxg src/gxg_simul.cpp src/genotype.cpp src/storage.cpp)

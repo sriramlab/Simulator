@@ -16,6 +16,7 @@ This repository contains tools for simulating phenotypes at biobank scale, incor
    - **Simulator_gxe_same_causal**: Simulates phenotypes with the same causal SNPs for G and GxE components.
    - **Simulator_gxe_causal_from_file**: Simulates phenotypes with user-specified causal SNPs for the G component.
    - **Simulator_gxe_heavy_tail**: Simulates phenotypes with noise from a heavy-tailed distribution (Student's t-distribution with DoF = 4).
+   - **Simulator_gxe_multi_E**: Simulates phenotype with GxE effects from different environments.
 
 3. **Phenotypes with Additive (G), Gene-by-gene (GxG), and Noise Components**: 
     - **Simulator_gxg**: Simulates phenotypes with G + GxG components.
@@ -103,6 +104,11 @@ make
 ### Simulator_gxe_heavy_tail
 #### Parameters: 
 * Same as **Simulator_gxe** 
+
+### Simulator_gxe_multi_E
+#### Parameters: 
+* Same as **Simulator_gxe** 
+* `-simul_par`: Simulator parameter file with N_env+2 lines (for G, GxE, and NxE components). The 2nd to N_env+1 lines are for GxE component under different environments. Each environment corresponds to a separate model with G+GxE+NxE.
 
 ### Simulator_gxg
 #### Parameters:
